@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Donut Chart</title>
+<style>
+/* Pfade zu den lokalen Font-Dateien */
+@font-face {
+  font-family: 'BrandonTextWeb-Regular';
+  src: url('Webfonts/321225_8_0.eot');
+  src: url('Webfonts/321225_8_0.eot?#iefix') format('embedded-opentype'),
+       url('Webfonts/321225_8_0.woff2') format('woff2'),
+       url('Webfonts/321225_8_0.woff') format('woff'),
+       url('Webfonts/321225_8_0.ttf') format('truetype');
+  font-display: swap;
+}
+
+body, html {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  font-family: 'BrandonTextWeb-Regular', 'BaskervilleMT', sans-serif;
+}
+
+.chart-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 0;
+  position: relative;
+}
+
+.chart {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background-color: #fff;
+  border-radius: 8px;
+  width: 100%;
+  height: 90%; /* Adjusted to make room for footnote */
+}
+
+.footnote {
+  font-size: clamp(9px, 1.2vw, 12px);
+  color: #666;
+  margin-top: 5px; /* Reduced margin to bring footnote closer */
+  text-align: center;
+  box-sizing: border-box;
+  padding: 0 10px;
+}
+
+canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.info-icon {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    font-size: 12px;
+    cursor: pointer;
+    color: #333;
+    background-color: #fff;
+    border: 1px solid #333;
+    border-radius: 50%;
+    padding: 5px;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.tooltip {
+    visibility: hidden;
+    width: 200px;
+    font-size: 10px;
+    background-color: #333;
+    color: #fff;
+    text-align: center;
+    border-radius: 6px;
+    padding: 5px;
+    position: absolute;
+    z-index: 1;
+    top: 15px;
+    right: 105%;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.info-icon:hover .tooltip {
+    visibility: visible;
+    opacity: 1;
+}
+</style>
+</head>
+<body>
+<div class="chart-container">
+  <div class="chart" id="donut-chart"></div>
+  <div class="info-icon">
+    <i class="fa-solid fa-info"></i>
+    <div class="tooltip">Die Erhebung und Aufbereitung der Daten von 15 Hochschulen ist abgeschlossen. Die Daten von 15 zusätzlichen Universitäten wurden bereits erhoben und werden derzeit aufbereitet. Der Higher Education Explorer (HEX) wird in den kommenden 24 Monaten mit den Daten von 50 weiteren Universitäten sukzessive erweitert.</div>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const ctxDonut = document.getElementById('donut-chart').appendChild(document.createElement('canvas')).getContext('2d');
+    const donutChart = new Chart(ctxDonut, {
+      type: 'doughnut',
+      data: {
+        labels: ['15 Universitäten in DB', '15 Universitäten in Progress', '50 verbleibende Universitäten'],
+        datasets: [{
+          data: [15, 15, 50],
+          backgroundColor: ['#195365', '#A96BF1', '#B5BFC5'],
+          borderWidth: 0,
+          hoverBackgroundColor: ['rgba(25, 83, 101, 0.8)', 'rgba(169, 107, 241, 0.8)', 'rgba(181, 191, 197, 0.8)']
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '30%',
+        animation: {
+          animateRotate: true,
+          duration: 2000
+        },
+        plugins: {
+          legend: {
+            position: 'bottom',
+            padding: 1550,  // Erhöht den Abstand der gesamten Legende zum Graphen
+            align: 'start',
+            labels: {
+              usePointStyle: true,
+              font: {
+                family: 'BrandonTextWeb-Regular', // Setzt die Schriftart für die Legende
+                size: 10 // Setzt die Schriftgröße für die Legende
+              },
+              padding: 10 // Adjusted padding to bring legend closer
+            }
+          },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                const label = context.label || '';
+                const backgroundColor = context.dataset.backgroundColor[context.dataIndex];
+                return ` ${label}`;
+              },
+              beforeLabel: function(context) {
+                return ''; // Entfernt das doppelte Label oben
+              },
+              labelColor: function(context) {
+                return {
+                  borderColor: context.dataset.backgroundColor[context.dataIndex],
+                  backgroundColor: context.dataset.backgroundColor[context.dataIndex]
+                };
+              },
+              labelTextColor: function(context) {
+                return '#FFF'; // Setzt die Textfarbe auf Weiß
+              },
+              title: function() {
+                return ''; // Entfernt den Titel des Tooltips
+              }
+            },
+            titleFont: {
+              family: 'BrandonTextWeb-Regular' // Setzt die Schriftart für den Tooltip-Titel
+            },
+            bodyFont: {
+              family: 'BrandonTextWeb-Regular' // Setzt die Schriftart für den Tooltip-Körper
+            },
+            displayColors: true // Stellt sicher, dass die Farbkästchen angezeigt werden
+          }
+        }
+      }
+    });
+  });
+</script>
+</body>
+</html>
