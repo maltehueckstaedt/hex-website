@@ -39,8 +39,8 @@ paster <- function(to_be_pasted_object, collapse_by = "|"){
 #/////////////////////////////////////////////////////////////////////////////
 
  #Read in db_hex.rds from local working directory
-db_hex <- readRDS("data/db_hex.rds") |> mutate(jahr_num=as.numeric(jahr)) |> filter(jahr_num > 2016) |> select(-jahr_num)
-
+db_hex <- readRDS("data/db_hex.rds") |> mutate(jahr_num=as.numeric(jahr)) |> 
+filter(jahr_num > 2016) |> select(-jahr_num)
 
 db_stud <- readRDS("data/db_studi.rds")
 db_finanz <- readRDS("data/db_finanz.rds")
@@ -61,13 +61,13 @@ setdiff(unique(db_hex$hochschule), unique(db_personal$hochschule))
 #check for same faechergruppe name
 db_hex_fg_names <- unique(splitter(db_hex$faechergruppe))
 setdiff(db_hex_fg_names, unique(db_stud$faechergruppe))
-setdiff(db_hex_fg_names, unique(db_finanz$faechergruppe)) # es fehlt "Außerhalb der Studienbereichsgliederung"
+setdiff(db_hex_fg_names, unique(db_finanz$faechergruppe)) # missing "Außerhalb der Studienbereichsgliederung"
 setdiff(db_hex_fg_names, unique(db_personal$faechergruppe))
 
 #/////////////////////////////////////////////////////////////////////////////
 #/////////////////////////////////////////////////////////////////////////////
 #/////////////////////////////////////////////////////////////////////////////
-# Count Orgas ------------------------------------------------------
+# Count organisations ------------------------------------------------------
 #/////////////////////////////////////////////////////////////////////////////
 #/////////////////////////////////////////////////////////////////////////////
 #/////////////////////////////////////////////////////////////////////////////
@@ -79,14 +79,19 @@ db_count_orgas <- db_hex %>%
 #/////////////////////////////////////////////////////////////////////////////
 #/////////////////////////////////////////////////////////////////////////////
 #/////////////////////////////////////////////////////////////////////////////
-# generate subdata-set ------------------------------------------------------
+# generate db_hex_sum ------------------------------------------------------
 #/////////////////////////////////////////////////////////////////////////////
 #/////////////////////////////////////////////////////////////////////////////
 #/////////////////////////////////////////////////////////////////////////////
 
+#/////////////////////////////////////////////////////////////////////////////
+# COMMENT: db_hex_sum contains organisation, hochschule, anzahl_kurse,
+# faechergruppe, and sem_jahr
+#/////////////////////////////////////////////////////////////////////////////
+
 db_hex_sum <- db_hex |>
-  filter(!hochschule == "Christian-Albrechts-Universität zu Kiel") |>
   mutate(sem_jahr = paste(semester, jahr, sep="_")) |>
+  filter(!organisation=="") |>
   group_by(organisation, hochschule) |>
   reframe(
     anzahl_kurse = n(),
@@ -94,48 +99,48 @@ db_hex_sum <- db_hex |>
     hochschule = list(unique(hochschule)),
     sem_jahr = list(unique(sem_jahr))
   ) |>
-  distinct()
-
-#/////////////////////////////////////////////////////////////////////////////
-#/////////////////////////////////////////////////////////////////////////////
-## clean semester-var ------------------------------------------------------
-#/////////////////////////////////////////////////////////////////////////////
-#/////////////////////////////////////////////////////////////////////////////
-
-
-db_hex_sum <- db_hex_sum |>
+  distinct() |>
   mutate(sem_jahr = map(sem_jahr, ~ map_chr(.x, function(x) {
     case_when(
       str_detect(x, regex("w|winter|Winter", ignore_case = TRUE)) ~ paste("Winter", str_extract(x, "\\d{4}"), sep="_"),
       str_detect(x, regex("s|sommer|Sommer", ignore_case = TRUE)) ~ paste("Sommer", str_extract(x, "\\d{4}"), sep="_"),
-      TRUE ~ x  # Sicherheitshalber, falls kein Muster passt
+      TRUE ~ x  # To be on the safe side, if no pattern fits: use the original value
     )
   })))
 
 #/////////////////////////////////////////////////////////////////////////////
 #/////////////////////////////////////////////////////////////////////////////
 #/////////////////////////////////////////////////////////////////////////////
-# generate subdata_set: number courses per hs --------------------------------
+# generate db_hex_sum_nach_fg -----------------------------------------------
 #/////////////////////////////////////////////////////////////////////////////
 #/////////////////////////////////////////////////////////////////////////////
 #/////////////////////////////////////////////////////////////////////////////
 
-# maximale anzahl von faechergruppe pro Zeile:
+#/////////////////////////////////////////////////////////////////////////////
+# COMMENT: 
+#/////////////////////////////////////////////////////////////////////////////
+
+# Maximum number of subject groups per row:
 str_count(db_hex$faechergruppe, "\\|") |> na.omit() |> max() + 1
 
-db_hex_sum_nach_fg <- db_hex %>%
+db_hex_sum_raw <- db_hex %>%
   filter(hochschule != "Christian-Albrechts-Universität zu Kiel") %>%
   group_by(faechergruppe, hochschule) %>%
   summarise(
     anzahl_kurse = n(),
     .groups = 'drop'
   )|>
-  mutate(faechergruppe_n = str_count(faechergruppe, pattern="\\|") + 1) |> # Anzahl fachgruppe
-  mutate(faechergruppe_split = str_split(faechergruppe, pattern="\\|")) |> # einzele faechergruppen als Liste
-  mutate(anzahl_kurse_interdisp =
+  mutate(faechergruppe_n = str_count(faechergruppe, pattern="\\|") + 1) |> # Number of faechergruppe
+  mutate(faechergruppe_split = str_split(faechergruppe, pattern="\\|")) |> # faechergruppe-elements as a string-list
+  mutate(anzahl_kurse_interdisp = # number of faechergruppe if row is interdisciplinary
   case_when(faechergruppe_n>1 ~ anzahl_kurse,
   TRUE ~ NA_integer_))
  
-
-
+db_hex_interdisp <- db_hex_sum_raw |> filter(!is.na(anzahl_kurse_interdisp))  %>%
+  unnest(faechergruppe_split) |> select(hochschule, faechergruppe_split, anzahl_kurse_interdisp) |> rename(faechergruppe=faechergruppe_split,
+           num_adding_curses=anzahl_kurse_interdisp)
  
+db_hex_sum_raw <-  db_hex_sum_raw |> filter(is.na(anzahl_kurse_interdisp))
+
+
+db_hex_sum_nach_fg <- left_join(db_hex_sum_raw,db_hex_interdisp, by=c("hochschule","faechergruppe"))
