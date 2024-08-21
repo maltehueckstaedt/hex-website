@@ -72,8 +72,8 @@ setdiff(db_hex_fg_names, unique(db_personal$faechergruppe))
 #/////////////////////////////////////////////////////////////////////////////
 #/////////////////////////////////////////////////////////////////////////////
 
-db_count_orgas <- db_hex %>% 
-  group_by(hochschule) %>%
+db_count_orgas <- db_hex |> 
+  group_by(hochschule) |>
   summarise(n_orga = n_distinct(organisation))
 
 #/////////////////////////////////////////////////////////////////////////////
@@ -123,9 +123,9 @@ db_hex_sum <- db_hex |>
 # Maximum number of subject groups per row:
 str_count(db_hex$faechergruppe, "\\|") |> na.omit() |> max() + 1
 
-db_hex_sum_raw <- db_hex %>%
-  filter(hochschule != "Christian-Albrechts-Universität zu Kiel") %>%
-  group_by(faechergruppe, hochschule) %>%
+db_hex_sum_raw <- db_hex |>
+  filter(!faechergruppe=="") |>
+  group_by(faechergruppe, hochschule) |>
   summarise(
     anzahl_kurse = n(),
     .groups = 'drop'
@@ -136,11 +136,27 @@ db_hex_sum_raw <- db_hex %>%
   case_when(faechergruppe_n>1 ~ anzahl_kurse,
   TRUE ~ NA_integer_))
  
-db_hex_interdisp <- db_hex_sum_raw |> filter(!is.na(anzahl_kurse_interdisp))  %>%
-  unnest(faechergruppe_split) |> select(hochschule, faechergruppe_split, anzahl_kurse_interdisp) |> rename(faechergruppe=faechergruppe_split,
-           num_adding_curses=anzahl_kurse_interdisp)
+db_hex_interdisp <- db_hex_sum_raw |> filter(!is.na(anzahl_kurse_interdisp)) |>
+  unnest(faechergruppe_split) |> 
+  select(hochschule, 
+        faechergruppe_split, 
+        anzahl_kurse_interdisp,
+        faechergruppe_n) |> 
+  rename(faechergruppe=faechergruppe_split,
+         num_adding_curses=anzahl_kurse_interdisp)
  
-db_hex_sum_raw <-  db_hex_sum_raw |> filter(is.na(anzahl_kurse_interdisp))
+db_hex_sum_raw <-  db_hex_sum_raw |> filter(is.na(anzahl_kurse_interdisp)) |> 
+                   select(-anzahl_kurse_interdisp, -faechergruppe_n)
 
 
-db_hex_sum_nach_fg <- left_join(db_hex_sum_raw,db_hex_interdisp, by=c("hochschule","faechergruppe"))
+db_hex_sum_nach_fg <- left_join(db_hex_sum_raw,db_hex_interdisp, 
+                      by=c("hochschule", "faechergruppe")) |>
+                      mutate(anzahl_kurse = ifelse(!is.na(num_adding_curses), anzahl_kurse + num_adding_curses, anzahl_kurse))
+
+                      
+view(db_hex_sum_nach_fg)
+ 
+# check number of faechergruppe per hochschule
+db_count_fgs <- db_hex_sum_nach_fg |> 
+  group_by(hochschule) |>
+  summarise(n_fgs = n_distinct(faechergruppe))
